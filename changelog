@@ -1,0 +1,20 @@
+2nd February 16:55 - Dungeon Generation class created
+2nd February 16.58 - made main function
+2nd February 17.15 - Made printDungeon Generation function - Prints out the Dungeon
+2nd February 17.55 - Made initializeDungeon function - Initializes the Dungeon with ' '
+4th February 11.39 - Made generateRoom - Makes rooms in the Dungeon
+4th February 12.40 - Made isValidRoom - Helper method for generateRoom. Checks if the position of the room is valid and is not coinciding with other rooms
+4th February 13:00 - Made fillRoom - Helper method for  generateRoom. It fills out the selected space with '.'
+4th February 18:03 - Made connectRoomsViaCorridor method - it connects the rooms with corridors
+4th February 20:18 - Made placeStairs method - It places upstairs and downstairs in the dungeon
+9th February 8:08 - Made checkDir method - check if the hideen file to store the saved dungeon exists or not
+9th February 12:09 - Made getPath method - returns the path of the file 
+10th February 17:02 - Made load_Dungeon - It loads any saved dungeon in the folder 
+11th February 23: 50 - Made save_dungeon - It saves a new dungeon in the hidden folder 
+12th Februry 1 :40 - Made placePC - Places player in the corridor 
+12th February 2:55 - made changes in placeStairs 
+12th February 10:07 - made changes in main function 
+15th February 15:00 - made the heap implementation of the Djikstra Algo 
+15th February 18:17 - made DjkikstraForTunnel method 
+17th February 9:10 - made DjkikstraForNonTunnel
+18Th February 22:20 - Debugged DjkikstraForNonTunnel and DjkikstraForTunnel
