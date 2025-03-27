@@ -90,7 +90,7 @@ typedef struct {
   int capacity;
 } event_queue_t;
 
-// ------ GLOBAL CHARACTER ARRAY ------
+
 #define MAX_CHARACTERS 1000
 static character_t characters[MAX_CHARACTERS];
 static int num_characters = 0;
@@ -134,7 +134,6 @@ static void do_monster_movement(character_t*m);
 // utility
 void checkDir();
 void getPath(char*buf,size_t size);
-
 void swap(node_t *a, node_t *b) {
   node_t temp = *a;
   *a = *b;
@@ -143,7 +142,6 @@ void swap(node_t *a, node_t *b) {
 static int parentIdx(int i){ return (i-1)/2; }
 static int leftIdx(int i){ return (2*i+1); }
 static int rightIdx(int i){ return (2*i+2); }
-
 void initializeHeap(heap_t*h,int capacity){
   h->array = malloc(capacity * sizeof(*h->array));
   h->size  = 0;
@@ -184,18 +182,17 @@ node_t deleteFromHeap(heap_t*h){
   heapifyDown(h,0);
   return top;
 }
-
-void djikstraForTunnel(int sx,int sy){
-  for(int r=0;r<HEIGHT;r++){
-    for(int c=0;c<WIDTH;c++){
-      disTunneling[r][c] = INT32_MAX;
+void djikstraForTunnel(int x,int y){
+  for(int i=0;i<HEIGHT;i++){
+    for(int j=0;j<WIDTH;j++){
+      disTunneling[i][j] = INT32_MAX;
     }
   }
-  disTunneling[sy][sx] = 0;
+  disTunneling[y][x] = 0;
 
   heap_t h;
   initializeHeap(&h, WIDTH*HEIGHT);
-  node_t start = { sx, sy, 0 };
+  node_t start = { x, y, 0 };
   insertNode(&h, start);
 
   int dirs[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,-1},{-1,1},{1,-1},{1,1} };
@@ -224,17 +221,17 @@ void djikstraForTunnel(int sx,int sy){
   deleteHeap(&h);
 }
 
-void djikstraForNonTunnel(int sx,int sy){
+void djikstraForNonTunnel(int x,int y){
   for(int r=0;r<HEIGHT;r++){
     for(int c=0;c<WIDTH;c++){
       disNonTunneling[r][c] = INT32_MAX;
     }
   }
-  disNonTunneling[sy][sx] = 0;
+  disNonTunneling[y][x] = 0;
 
   heap_t h; 
   initializeHeap(&h, WIDTH*HEIGHT);
-  node_t start = { sx, sy, 0 };
+  node_t start = { x, y, 0 };
   insertNode(&h, start);
 
   int dirs[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,-1},{-1,1},{1,-1},{1,1} };
@@ -258,7 +255,6 @@ void djikstraForNonTunnel(int sx,int sy){
   }
   deleteHeap(&h);
 }
-
 
 static int inBounds(int x, int y) {
   return (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT);
@@ -348,6 +344,7 @@ void connectRoomsViaCorridor(){
   }
 }
 
+
 void placeStairs(){
   int flag=1, upFlag=0, downFlag=0;
   while(flag){
@@ -370,12 +367,16 @@ void placeStairs(){
 
 
 static void new_level(int nummon) {
+  
   num_characters=0;
+
+  // Build a new random dungeon
   initializeDungeon();
   generateRooms();
   connectRoomsViaCorridor();
   placeStairs();
 
+  
   if(room_count>0) {
     pc_x = room_x[0];
     pc_y = room_y[0];
@@ -384,23 +385,22 @@ static void new_level(int nummon) {
     pc_y = 1;
   }
 
+  // Update base_map and place the PC symbol
   memcpy(base_map, dungeon, sizeof(base_map));
-
-  // place PC in the map array
   placePC(pc_x, pc_y);
 
+  // Recompute distances
   djikstraForNonTunnel(pc_x, pc_y);
   djikstraForTunnel(pc_x, pc_y);
 
+  // Add the PC to the global array, then create nummon monsters
   create_pc();
   for(int i=0; i<nummon; i++) {
     create_monster();
   }
 }
 
-// ----------------------------------------------------------------
-// ------------------ PC & Monster Creation ------------------------
-// ----------------------------------------------------------------
+// Create a single monster in a random floor cell
 static void create_monster(){
   int rx,ry;
   do{
@@ -414,36 +414,38 @@ static void create_monster(){
   m->type = char_monster;
   m->alive=1;
   m->x=rx; m->y=ry;
-  m->speed=spd; m->turn=0; m->hp=10;
+  m->speed=spd; m->turn=0; m->hp=10;   // for example
   m->monster_btype=flags;
   char hex_map[]="0123456789abcdef";
   m->symbol=hex_map[flags];
   dungeon[ry][rx] = m->symbol;
 }
-
+// Create the PC
 static void create_pc(){
   character_t*pc=&characters[num_characters++];
-  pc->type=char_pc; pc->alive=1;
-  pc->x=pc_x; pc->y=pc_y;
-  pc->speed=10; pc->turn=0; pc->hp=50;
+  pc->type=char_pc; 
+  pc->alive=1;
+  pc->x=pc_x; 
+  pc->y=pc_y;
+  pc->speed=10; 
+  pc->turn=0; 
+  pc->hp=50;
   pc->monster_btype=0;
   pc->symbol='@';
   dungeon[pc_y][pc_x] = '@';
 }
 
-// ----------------------------------------------------------------
-// --------------------- Movement & Attacks ------------------------
-// ----------------------------------------------------------------
+// Monster's AI movement
 static void do_monster_movement(character_t*m)
 {
   if(!m->alive) return;
-
   int oldx=m->x, oldy=m->y;
 
   int intelligence=(m->monster_btype&0x1)?1:0;
   int tunneling=(m->monster_btype&0x4)?1:0;
   int erratic=(m->monster_btype&0x8)?1:0;
 
+  // 50% chance to move randomly if erratic
   int do_random=0;
   if(erratic && (rand()%2==0)){
     do_random=1;
@@ -457,10 +459,14 @@ static void do_monster_movement(character_t*m)
     bestx=m->x+ddx[rr];
     besty=m->y+ddy[rr];
   } else if(!intelligence){
+    // Unintelligent monster just moves closer to the PC in x/y
     int dx=(pc_x>m->x)?1:((pc_x<m->x)?-1:0);
     int dy=(pc_y>m->y)?1:((pc_y<m->y)?-1:0);
-    bestx=m->x+dx; besty=m->y+dy;
+    bestx=m->x+dx; 
+    besty=m->y+dy;
   } else {
+    // Intelligent monster consults the distance map
+    // Tunneling picks disTunneling; non-tunneling picks disNonTunneling
     int bestDist=INT32_MAX;
     for(int i=-1;i<=1;i++){
       for(int j=-1;j<=1;j++){
@@ -477,29 +483,33 @@ static void do_monster_movement(character_t*m)
     }
   }
 
+  // If tunneling and there's some hardness, degrade it
   if(tunneling && hardness[besty][bestx]>0 && hardness[besty][bestx]<255){
     hardness[besty][bestx] -= 85;
     if(hardness[besty][bestx]>0) {
+      // The monster used its turn just to dig
       return;
     }
+    // If fully dug, turn into corridor
     dungeon[besty][bestx]='#';
   }
 
+  // If new location has the PC, PC is killed
   if(dungeon[besty][bestx]=='@') {
     pc_is_alive=0;
   }
 
+  // Restore the old cell from base_map
   dungeon[oldy][oldx] = base_map[oldy][oldx];
 
-  m->x=bestx; m->y=besty;
+  // Move monster
+  m->x=bestx; 
+  m->y=besty;
   if(m->alive) {
     dungeon[besty][bestx] = m->symbol;
   }
 }
 
-// ----------------------------------------------------------------
-// ------------------------ Event Queue ----------------------------
-// ----------------------------------------------------------------
 static void swap_events(event_t*a,event_t*b){
   event_t tmp=*a;*a=*b;*b=tmp;
 }
@@ -550,9 +560,6 @@ static void del_event_queue(event_queue_t*eq){
   eq->array=NULL; eq->size=0; eq->capacity=0;
 }
 
-// ----------------------------------------------------------------
-// --------------------- Ncurses UI Code ---------------------------
-// ----------------------------------------------------------------
 static void init_curses() {
   initscr();
   cbreak();
@@ -561,12 +568,10 @@ static void init_curses() {
   curs_set(0);
   start_color();
 }
-
 static void end_curses() {
   endwin();
 }
 
-// Display a single-line message at the top (line 0).
 static void display_message(const char *msg) {
   move(0,0);
   clrtoeol();
@@ -574,7 +579,6 @@ static void display_message(const char *msg) {
   refresh();
 }
 
-// Print the entire dungeon using ncurses on lines 1..21.
 static void display_dungeon() {
   for(int r=0; r<HEIGHT; r++){
     move(r+1, 0);
@@ -585,7 +589,6 @@ static void display_dungeon() {
   refresh();
 }
 
-// The 'm' command: show monster list.
 static void display_monster_list()
 {
   typedef struct {
@@ -665,7 +668,7 @@ static void display_monster_list()
   display_message("Exited monster list.");
 }
 
-// The fix: check base_map instead of dungeon when pressing stairs
+// Check if the PC can walk on a cell (floor, corridor, or stairs)
 static int pc_can_walk_on(char cell)
 {
   return (cell == '.' || cell == '#' || cell == '<' || cell == '>');
@@ -677,15 +680,18 @@ static void handle_pc_input(character_t *pc)
   while(1) {
     int ch = getch();
     switch(ch) {
+      // diagonal, cardinal movement plus rest
       case '7': case 'y': {
         int nx=pc->x-1; int ny=pc->y-1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack any monster in that cell
           for(int i=0;i<num_characters;i++){
             if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
           }
+          // Move PC
           dungeon[pc->y][pc->x]=base_map[pc->y][pc->x];
           pc->x=nx; pc->y=ny;
           dungeon[ny][nx]='@';
@@ -697,8 +703,9 @@ static void handle_pc_input(character_t *pc)
       case '8': case 'k': {
         int nx=pc->x; int ny=pc->y-1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack any monster there
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -714,8 +721,9 @@ static void handle_pc_input(character_t *pc)
       case '9': case 'u': {
         int nx=pc->x+1; int ny=pc->y-1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -731,8 +739,9 @@ static void handle_pc_input(character_t *pc)
       case '6': case 'l': {
         int nx=pc->x+1; int ny=pc->y;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -748,8 +757,9 @@ static void handle_pc_input(character_t *pc)
       case '3': case 'n': {
         int nx=pc->x+1; int ny=pc->y+1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -765,8 +775,9 @@ static void handle_pc_input(character_t *pc)
       case '2': case 'j': {
         int nx=pc->x; int ny=pc->y+1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -782,8 +793,9 @@ static void handle_pc_input(character_t *pc)
       case '1': case 'b': {
         int nx=pc->x-1; int ny=pc->y+1;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -799,8 +811,9 @@ static void handle_pc_input(character_t *pc)
       case '4': case 'h': {
         int nx=pc->x-1; int ny=pc->y;
         if(inBounds(nx,ny) && pc_can_walk_on(dungeon[ny][nx])) {
+          // Attack
           for(int i=0;i<num_characters;i++){
-            if(characters[i].alive &&characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
+            if(characters[i].alive && characters[i].x==nx && characters[i].y==ny && &characters[i]!=pc){
               characters[i].alive=0;
               if(characters[i].type==char_pc) pc_is_alive=0;
             }
@@ -813,10 +826,15 @@ static void handle_pc_input(character_t *pc)
         }
         return;
       }
-      // Stairs: check the **base_map** so that overwriting with '@' doesn't break logic
+
+      // Stairs: check the base_map to verify presence of < or >
       case '>': {
         if(base_map[pc->y][pc->x] == '>'){
           new_level(global_num_monsters);
+          // Save after descending
+          char path[1024];
+          getPath(path, sizeof(path));
+          save_dungeon(path);
           display_message("You went down the stairs...");
         } else {
           display_message("No downward staircase here!");
@@ -826,6 +844,10 @@ static void handle_pc_input(character_t *pc)
       case '<': {
         if(base_map[pc->y][pc->x] == '<'){
           new_level(global_num_monsters);
+          // Save after ascending
+          char path[1024];
+          getPath(path, sizeof(path));
+          save_dungeon(path);
           display_message("You went up the stairs...");
         } else {
           display_message("No upward staircase here!");
@@ -833,13 +855,14 @@ static void handle_pc_input(character_t *pc)
         return;
       }
       case '5': case ' ': case '.':
+        // Rest
         display_message("You rest.");
         return;
       case 'm':
         display_monster_list();
         break;  // show list but do not consume turn
       case 'Q':
-        pc_is_alive=0;
+        // Quit
         return;
       default:
         break;
@@ -847,13 +870,11 @@ static void handle_pc_input(character_t *pc)
   }
 }
 
+// Place PC symbol into dungeon
 static void placePC(int x,int y){
-  dungeon[y][x]='@';
+  dungeon[y][x] = '@';
 }
 
-// ----------------------------------------------------------------
-// --------------------- File I/O, load/save -----------------------
-// ----------------------------------------------------------------
 void load_dungeon(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -861,6 +882,7 @@ void load_dungeon(const char *path)
       fprintf(stderr, "Error opening file: %s\n", path);
       exit(1);
     }
+    // Check marker
     char marker[MARKER_LEN+1];
     fread(marker,1,MARKER_LEN,f);
     marker[MARKER_LEN]='\0';
@@ -869,68 +891,139 @@ void load_dungeon(const char *path)
       fclose(f);
       exit(1);
     }
-    uint32_t version; fread(&version,sizeof(version),1,f);
+
+    // Check version
+    uint32_t version; 
+    fread(&version,sizeof(version),1,f);
     version=be32toh(version);
     if(version!=FILE_VERSION){
       fprintf(stderr,"Unsupported file version\n");
       fclose(f);
       exit(1);
     }
-    uint32_t file_size; fread(&file_size,sizeof(file_size),1,f);
+
+    // Read file size
+    uint32_t file_size; 
+    fread(&file_size,sizeof(file_size),1,f);
     file_size=be32toh(file_size);
 
+    // Read PC location
     uint8_t pcx,pcy;
     fread(&pcx,1,1,f);
     fread(&pcy,1,1,f);
-    pc_x=pcx; pc_y=pcy;
+    pc_x=pcx; 
+    pc_y=pcy;
 
+    // Read hardness map
     for(int y=0;y<HEIGHT;y++){
       for(int x=0;x<WIDTH;x++){
-        uint8_t h; fread(&h,1,1,f);
+        uint8_t h; 
+        fread(&h,1,1,f);
         hardness[y][x]=h;
       }
     }
-    uint16_t r; fread(&r,sizeof(r),1,f);
+
+    // Rooms
+    uint16_t r; 
+    fread(&r,sizeof(r),1,f);
     r=be16toh(r);
     room_count=0;
-    for(int i=0;i<r&&i<MAX_ROOMS;i++){
+    for(int i=0; i<r && i<MAX_ROOMS; i++){
       uint8_t rx,ry,rw,rh;
-      fread(&rx,1,1,f); fread(&ry,1,1,f);
-      fread(&rw,1,1,f); fread(&rh,1,1,f);
-      room_x[i]=rx; room_y[i]=ry;
-      room_w[i]=rw; room_h[i]=rh;
+      fread(&rx,1,1,f); 
+      fread(&ry,1,1,f);
+      fread(&rw,1,1,f); 
+      fread(&rh,1,1,f);
+      room_x[i]=rx; 
+      room_y[i]=ry;
+      room_w[i]=rw; 
+      room_h[i]=rh;
       room_count++;
     }
-    uint16_t u; fread(&u,sizeof(u),1,f);
-    u=be16toh(u); upCount=0;
-    if(u>0){
-      uint8_t sx,sy; fread(&sx,1,1,f); fread(&sy,1,1,f);
-      upCount=1; up_xCoord=sx; up_yCoord=sy;
-    }
-    uint16_t d; fread(&d,sizeof(d),1,f);
-    d=be16toh(d); downCount=0;
-    if(d>0){
-      uint8_t sx,sy; fread(&sx,1,1,f); fread(&sy,1,1,f);
-      downCount=1; down_xCoord=sx; down_yCoord=sy;
-    }
-    fclose(f);
 
-    for(int yy=0;yy<HEIGHT;yy++){
-      for(int xx=0;xx<WIDTH;xx++){
-        if(hardness[yy][xx]==255) dungeon[yy][xx]=' ';
-        else if(hardness[yy][xx]>0) dungeon[yy][xx]=' ';
-        else dungeon[yy][xx]='#';
+    // Up stairs
+    uint16_t u; 
+    fread(&u,sizeof(u),1,f);
+    u=be16toh(u); 
+    upCount=0;
+    if(u>0){
+      uint8_t sx,sy; 
+      fread(&sx,1,1,f); 
+      fread(&sy,1,1,f);
+      upCount=1; 
+      up_xCoord=sx; 
+      up_yCoord=sy;
+    }
+
+    // Down stairs
+    uint16_t d; 
+    fread(&d,sizeof(d),1,f);
+    d=be16toh(d); 
+    downCount=0;
+    if(d>0){
+      uint8_t sx,sy; 
+      fread(&sx,1,1,f); 
+      fread(&sy,1,1,f);
+      downCount=1; 
+      down_xCoord=sx; 
+      down_yCoord=sy;
+    }
+
+    // Reconstruct the dungeon map from hardness + room definitions
+    for(int yy=0; yy<HEIGHT; yy++){
+      for(int xx=0; xx<WIDTH; xx++){
+        if(hardness[yy][xx]==255) 
+          dungeon[yy][xx]=' ';
+        else if(hardness[yy][xx]>0) 
+          dungeon[yy][xx]=' ';
+        else 
+          dungeon[yy][xx]='#';
       }
     }
     for(int i=0;i<room_count;i++){
-      for(int row=room_y[i];row<room_y[i]+room_h[i];row++){
-        for(int col=room_x[i];col<room_x[i]+room_w[i];col++){
+      for(int row=room_y[i]; row<room_y[i]+room_h[i]; row++){
+        for(int col=room_x[i]; col<room_x[i]+room_w[i]; col++){
           dungeon[row][col]='.';
         }
       }
     }
     if(upCount>0)   dungeon[ up_yCoord ][ up_xCoord ]='<';
     if(downCount>0) dungeon[ down_yCoord ][ down_xCoord ]='>';
+
+    // Now read in the monster array
+    uint16_t monster_count;
+    if(fread(&monster_count, sizeof(monster_count), 1, f) == 1) {
+      monster_count = be16toh(monster_count);
+    } else {
+      monster_count=0;
+    }
+
+    // We place them into global array
+    num_characters=0;  // We'll add monsters + then PC
+    for(int i=0; i<monster_count; i++){
+      uint8_t mx, my, mspeed, mhp, mbtype;
+      fread(&mx, 1, 1, f);
+      fread(&my, 1, 1, f);
+      fread(&mspeed, 1, 1, f);
+      fread(&mhp, 1, 1, f);
+      fread(&mbtype, 1, 1, f);
+
+      character_t*m = &characters[num_characters++];
+      m->type = char_monster;
+      m->alive=1;
+      m->x=mx; 
+      m->y=my;
+      m->speed=mspeed;
+      m->turn=0;
+      m->hp=mhp;
+      m->monster_btype=mbtype;
+      char hex_map[]="0123456789abcdef";
+      m->symbol= hex_map[ mbtype & 0x0F ];
+      // place it in the dungeon
+      dungeon[my][mx] = m->symbol;
+    }
+
+    fclose(f);
 }
 
 void save_dungeon(const char*path)
@@ -943,20 +1036,24 @@ void save_dungeon(const char*path)
     fwrite(FILE_MARKER,1,MARKER_LEN,f);
     uint32_t version_be=htobe32(FILE_VERSION);
     fwrite(&version_be,sizeof(version_be),1,f);
-
     uint16_t up_stairs_count=(upCount>0)?1:0;
     uint16_t down_stairs_count=(downCount>0)?1:0;
-
     uint32_t file_size=1702+(room_count*4)+2+(up_stairs_count*2)+2+(down_stairs_count*2);
+    uint16_t alive_monsters=0;
+    for(int i=0; i<num_characters; i++){
+      if(characters[i].type==char_monster && characters[i].alive) {
+        alive_monsters++;
+      }
+    }
+    file_size += 2 + alive_monsters*5;
+
     uint32_t file_size_be=htobe32(file_size);
     fwrite(&file_size_be,sizeof(file_size_be),1,f);
-
-    uint8_t pcx=pc_x, pcy=pc_y;
+    uint8_t pcx=(uint8_t)pc_x, pcy=(uint8_t)pc_y;
     fwrite(&pcx,1,1,f);
     fwrite(&pcy,1,1,f);
-
-    for(int y=0;y<HEIGHT;y++){
-      for(int x=0;x<WIDTH;x++){
+    for(int y=0; y<HEIGHT; y++){
+      for(int x=0; x<WIDTH; x++){
         uint8_t hh=hardness[y][x];
         fwrite(&hh,1,1,f);
       }
@@ -964,36 +1061,53 @@ void save_dungeon(const char*path)
     uint16_t r_be=htobe16(room_count);
     fwrite(&r_be,sizeof(r_be),1,f);
     for(int i=0;i<room_count;i++){
-      uint8_t rx=room_x[i], ry=room_y[i], rw=room_w[i], rh=room_h[i];
+      uint8_t rx=room_x[i], ry=room_y[i];
+      uint8_t rw=room_w[i], rh=room_h[i];
       fwrite(&rx,1,1,f);
       fwrite(&ry,1,1,f);
       fwrite(&rw,1,1,f);
       fwrite(&rh,1,1,f);
     }
+
     uint16_t up_be=htobe16(up_stairs_count);
     fwrite(&up_be,sizeof(up_be),1,f);
     if(up_stairs_count==1){
       uint8_t sx=(uint8_t)up_xCoord, sy=(uint8_t)up_yCoord;
-      fwrite(&sx,1,1,f); fwrite(&sy,1,1,f);
+      fwrite(&sx,1,1,f); 
+      fwrite(&sy,1,1,f);
     }
     uint16_t down_be=htobe16(downCount>0?1:0);
     fwrite(&down_be,sizeof(down_be),1,f);
     if(downCount>0){
       uint8_t sx=(uint8_t)down_xCoord, sy=(uint8_t)down_yCoord;
-      fwrite(&sx,1,1,f); fwrite(&sy,1,1,f);
+      fwrite(&sx,1,1,f); 
+      fwrite(&sy,1,1,f);
+    }
+    uint16_t am_be=htobe16(alive_monsters);
+    fwrite(&am_be,sizeof(am_be),1,f);
+    for(int i=0; i<num_characters; i++){
+      if(characters[i].type==char_monster && characters[i].alive){
+        uint8_t mx=(uint8_t)characters[i].x;
+        uint8_t my=(uint8_t)characters[i].y;
+        uint8_t mspeed=(uint8_t)characters[i].speed;
+        uint8_t mhp=(uint8_t)characters[i].hp;
+        uint8_t mbtype=(uint8_t)characters[i].monster_btype;
+        fwrite(&mx,1,1,f);
+        fwrite(&my,1,1,f);
+        fwrite(&mspeed,1,1,f);
+        fwrite(&mhp,1,1,f);
+        fwrite(&mbtype,1,1,f);
+      }
     }
     fclose(f);
 }
 
-// ----------------------------------------------------------------
-// ------------------------- MAIN ----------------------------------
-// ----------------------------------------------------------------
 int main(int argc,char*argv[])
 {
   srand(time(NULL));
+
   int load=0, save=0;
   int local_num_mon = DEFAULT_NUMMON;
-
   for(int i=1;i<argc;i++){
     if(!strcmp(argv[i],"--load")) load=1;
     else if(!strcmp(argv[i],"--save")) save=1;
@@ -1002,7 +1116,6 @@ int main(int argc,char*argv[])
     }
   }
   global_num_monsters=local_num_mon;
-
   checkDir();
   char path[1024];
   getPath(path,sizeof(path));
@@ -1018,40 +1131,58 @@ int main(int argc,char*argv[])
       pc_x=room_x[0];
       pc_y=room_y[0];
     } else {
-      pc_x=1; pc_y=1;
+      pc_x=1; 
+      pc_y=1;
     }
   }
 
-  memcpy(base_map,dungeon,sizeof(base_map));
+ //copy of the map
+  memcpy(base_map, dungeon, sizeof(base_map));
   placePC(pc_x,pc_y);
-
   if(save){
     save_dungeon(path);
   }
-
   djikstraForNonTunnel(pc_x,pc_y);
   djikstraForTunnel(pc_x,pc_y);
-
-  num_characters=0;
-  create_pc();
-  for(int i=0;i<local_num_mon;i++){
-    create_monster();
+  int existing_characters = num_characters; 
+  int i;
+  character_t *pc = &characters[num_characters++];
+  pc->type=char_pc; 
+  pc->alive=1;
+  pc->x=pc_x; 
+  pc->y=pc_y;
+  pc->speed=10; 
+  pc->turn=0; 
+  pc->hp=50;
+  pc->monster_btype=0;
+  pc->symbol='@';
+  dungeon[pc_y][pc_x] = '@';
+  if(!load){
+    for(i=0; i<local_num_mon; i++){
+      create_monster();
+    }
+  }
+  event_queue_t eq;
+  init_event_queue(&eq,(num_characters+1)*10);
+  int aliveMonsters=0;
+  for(i=0; i<num_characters;i++){
+    if(characters[i].type==char_monster && characters[i].alive){
+      aliveMonsters++;
+    }
   }
 
-  event_queue_t eq;
-  init_event_queue(&eq,(local_num_mon+1)*10);
-
-  int aliveMonsters=local_num_mon;
   int current_time=0;
-  for(int i=0;i<num_characters;i++){
-    event_t e; e.time=0; e.c=&characters[i];
+
+  for(i=0;i<num_characters;i++){
+    event_t e; 
+    e.time=0; 
+    e.c=&characters[i];
     eq_push(&eq,e);
   }
 
   init_curses();
-  display_message("Welcome to the roguelike. Use movement keys, '>' '<', 'm', 'Q', etc.");
 
-  while(!eq_empty(&eq)&&pc_is_alive&&aliveMonsters>0){
+  while(!eq_empty(&eq) && pc_is_alive && aliveMonsters>0){
     event_t e=eq_pop(&eq);
     current_time=e.time;
     character_t*c=e.c;
@@ -1071,7 +1202,9 @@ int main(int argc,char*argv[])
     } else {
       do_monster_movement(c);
       if(!pc_is_alive) break;
-      if(!c->alive) aliveMonsters--;
+      if(!c->alive){
+        aliveMonsters--;
+      }
     }
 
     if(c->alive){
@@ -1080,7 +1213,6 @@ int main(int argc,char*argv[])
       eq_push(&eq,ne);
     }
   }
-
   if(!pc_is_alive){
     display_dungeon();
     display_message("You lose! The PC has been killed.");
@@ -1097,10 +1229,6 @@ int main(int argc,char*argv[])
   del_event_queue(&eq);
   return 0;
 }
-
-// ----------------------------------------------------------------
-// -------------------- checkDir & getPath -------------------------
-// ----------------------------------------------------------------
 void checkDir(){
   char*home=getenv("HOME");
   if(!home){
